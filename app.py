@@ -102,6 +102,22 @@ def update_progress(chapter_id: int, kind: str, correct: bool):
     st.session_state.progress[key] = prog
     save_progress(st.session_state.user_id, chapter_id, prog)
 
+def log_exercise_answer(user_id: str, chapter_id: int, exercise_key: str,
+                        answer_text: str, is_correct: bool | None):
+    query = text("""
+        insert into exercise_answers (user_id, chapter_id, exercise_key, answer_text, is_correct)
+        values (:user_id, :chapter_id, :exercise_key, :answer_text, :is_correct)
+    """)
+    with conn.session as s:
+        s.execute(query, {
+            "user_id": user_id,
+            "chapter_id": chapter_id,
+            "exercise_key": exercise_key,
+            "answer_text": answer_text,
+            "is_correct": is_correct,
+        })
+        s.commit()
+
 # ---------------------------------------------------------
 # Cursusdata per hoofdstuk
 # ---------------------------------------------------------
