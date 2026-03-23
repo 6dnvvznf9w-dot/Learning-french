@@ -1,6 +1,9 @@
 import streamlit as st
 from gtts import gTTS
 import io
+from sqlalchemy import text
+
+conn = st.connection("frans_db", type="sql")  # naam komt uit secrets
 
 # ---------------------------------------------------------
 # Basisconfiguratie
@@ -27,6 +30,77 @@ def tts_bytes(text: str, lang: str = "fr") -> bytes:
 
 def normalize_answer(s: str) -> str:
     return s.strip().lower().replace("’", "'")
+
+
+# ---------------------------------------------------------
+# Progress helpers
+# ---------------------------------------------------------
+
+if "user_id" not in st.session_state:
+    st.session_state.user_id = "David"  # jouw standaard gebruiker
+
+if "progress" not in st.session_state:
+    st.session_state.progress = {}  # { (user_id, chapter_id): prog_dict }
+
+
+def load_progress(user_id: str, chapter_id: int):
+    query = text("""
+        select reading_done, reading_correct, ex_done, ex_correct
+        from progress
+        where user_id = :user_id and chapter_id = :chapter_id
+    """)
+    with conn.session as s:
+        row = s.execute(query, {"user_id": user_id, "chapter_id": chapter_id}).fetchone()
+    if row:
+        return dict(row._mapping)
+    else:
+        return {"reading_done": 0, "reading_correct": 0, "ex_done": 0, "ex_correct": 0}
+
+
+def save_progress(user_id: str, chapter_id: int, prog: dict):
+    query = text("""
+        insert into progress (user_id, chapter_id, reading_done, reading_correct, ex_done, ex_correct)
+        values (:user_id, :chapter_id, :reading_done, :reading_correct, :ex_done, :ex_correct)
+        on conflict (user_id, chapter_id) do update set
+          reading_done    = excluded.reading_done,
+          reading_correct = excluded.reading_correct,
+          ex_done         = excluded.ex_done,
+          ex_correct      = excluded.ex_correct,
+          updated_at      = now()
+    """)
+    with conn.session as s:
+        s.execute(query, {
+            "user_id": user_id,
+            "chapter_id": chapter_id,
+            "reading_done": prog["reading_done"],
+            "reading_correct": prog["reading_correct"],
+            "ex_done": prog["ex_done"],
+            "ex_correct": prog["ex_correct"],
+        })
+        s.commit()
+
+
+def get_progress(chapter_id: int):
+    key = (st.session_state.user_id, chapter_id)
+    if key not in st.session_state.progress:
+        st.session_state.progress[key] = load_progress(st.session_state.user_id, chapter_id)
+    return st.session_state.progress[key]
+
+
+def update_progress(chapter_id: int, kind: str, correct: bool):
+    # kind: "reading" of "ex"
+    key = (st.session_state.user_id, chapter_id)
+    prog = get_progress(chapter_id)
+    if kind == "reading":
+        prog["reading_done"] += 1
+        if correct:
+            prog["reading_correct"] += 1
+    elif kind == "ex":
+        prog["ex_done"] += 1
+        if correct:
+            prog["ex_correct"] += 1
+    st.session_state.progress[key] = prog
+    save_progress(st.session_state.user_id, chapter_id, prog)
 
 # ---------------------------------------------------------
 # Cursusdata per hoofdstuk
@@ -1913,6 +1987,12 @@ if mode == "Leercursus (hoofdstukken)":
 
 elif mode == "Schrijven (vrije teksten)":
     st.title("Schrijven – vrije teksten over je werk")
+
+    prog = get_progress(chapter["id"])
+    st.markdown(
+        f"**Voortgang {st.session_state.user_id}:** "
+        f"lees {prog['reading_correct']}/{prog['reading_done']}, "
+        f"oefeningen {prog['ex_correct']}/{prog['ex_done']} ✅"
 
     st.markdown("""
 Gebruik dit scherm om langere teksten te schrijven, bijvoorbeeld:
