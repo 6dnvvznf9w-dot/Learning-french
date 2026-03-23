@@ -1988,12 +1988,6 @@ if mode == "Leercursus (hoofdstukken)":
 elif mode == "Schrijven (vrije teksten)":
     st.title("Schrijven – vrije teksten over je werk")
 
-    prog = get_progress(chapter["id"])
-    st.markdown(
-        f"**Voortgang {st.session_state.user_id}:** "
-        f"lees {prog['reading_correct']}/{prog['reading_done']}, "
-        f"oefeningen {prog['ex_correct']}/{prog['ex_done']} ✅"
-    )
 
     st.markdown("""
 Gebruik dit scherm om langere teksten te schrijven, bijvoorbeeld:
