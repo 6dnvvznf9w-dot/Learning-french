@@ -3,7 +3,12 @@ from gtts import gTTS
 import io
 from sqlalchemy import text
 
-conn = st.connection("frans_db", type="sql")  # naam komt uit secrets
+# ---------------------------------------------------------
+# DB-verbinding (Supabase / Postgres)
+# ---------------------------------------------------------
+
+# Naam moet overeenkomen met [connections.frans_db] in Streamlit secrets
+conn = st.connection("frans_db", type="sql")
 
 # ---------------------------------------------------------
 # Basisconfiguratie
@@ -12,7 +17,7 @@ conn = st.connection("frans_db", type="sql")  # naam komt uit secrets
 st.set_page_config(
     page_title="Frans voor Cargo Operations",
     page_icon="🇫🇷",
-    layout="centered"
+    layout="centered",
 )
 
 # ---------------------------------------------------------
@@ -28,37 +33,50 @@ def tts_bytes(text: str, lang: str = "fr") -> bytes:
     buf.seek(0)
     return buf.read()
 
+
 def normalize_answer(s: str) -> str:
     return s.strip().lower().replace("’", "'")
 
 
 # ---------------------------------------------------------
-# Progress helpers
+# Progress + logging helpers
 # ---------------------------------------------------------
 
 if "user_id" not in st.session_state:
     st.session_state.user_id = "David"  # jouw standaard gebruiker
 
 if "progress" not in st.session_state:
-    st.session_state.progress = {}  # { (user_id, chapter_id): prog_dict }
+    # {(user_id, chapter_id): {"reading_done": ..., "ex_done": ...}}
+    st.session_state.progress = {}
 
 
 def load_progress(user_id: str, chapter_id: int):
-    query = text("""
+    query = text(
+        """
         select reading_done, reading_correct, ex_done, ex_correct
         from progress
         where user_id = :user_id and chapter_id = :chapter_id
-    """)
+        """
+    )
     with conn.session as s:
-        row = s.execute(query, {"user_id": user_id, "chapter_id": chapter_id}).fetchone()
+        row = s.execute(
+            query,
+            {"user_id": user_id, "chapter_id": chapter_id},
+        ).fetchone()
     if row:
         return dict(row._mapping)
     else:
-        return {"reading_done": 0, "reading_correct": 0, "ex_done": 0, "ex_correct": 0}
+        return {
+            "reading_done": 0,
+            "reading_correct": 0,
+            "ex_done": 0,
+            "ex_correct": 0,
+        }
 
 
 def save_progress(user_id: str, chapter_id: int, prog: dict):
-    query = text("""
+    query = text(
+        """
         insert into progress (user_id, chapter_id, reading_done, reading_correct, ex_done, ex_correct)
         values (:user_id, :chapter_id, :reading_done, :reading_correct, :ex_done, :ex_correct)
         on conflict (user_id, chapter_id) do update set
@@ -67,30 +85,39 @@ def save_progress(user_id: str, chapter_id: int, prog: dict):
           ex_done         = excluded.ex_done,
           ex_correct      = excluded.ex_correct,
           updated_at      = now()
-    """)
+        """
+    )
     with conn.session as s:
-        s.execute(query, {
-            "user_id": user_id,
-            "chapter_id": chapter_id,
-            "reading_done": prog["reading_done"],
-            "reading_correct": prog["reading_correct"],
-            "ex_done": prog["ex_done"],
-            "ex_correct": prog["ex_correct"],
-        })
+        s.execute(
+            query,
+            {
+                "user_id": user_id,
+                "chapter_id": chapter_id,
+                "reading_done": prog["reading_done"],
+                "reading_correct": prog["reading_correct"],
+                "ex_done": prog["ex_done"],
+                "ex_correct": prog["ex_correct"],
+            },
+        )
         s.commit()
 
 
 def get_progress(chapter_id: int):
     key = (st.session_state.user_id, chapter_id)
     if key not in st.session_state.progress:
-        st.session_state.progress[key] = load_progress(st.session_state.user_id, chapter_id)
+        st.session_state.progress[key] = load_progress(
+            st.session_state.user_id, chapter_id
+        )
     return st.session_state.progress[key]
 
 
 def update_progress(chapter_id: int, kind: str, correct: bool):
-    # kind: "reading" of "ex"
+    """
+    kind: "reading" of "ex"
+    """
     key = (st.session_state.user_id, chapter_id)
     prog = get_progress(chapter_id)
+
     if kind == "reading":
         prog["reading_done"] += 1
         if correct:
@@ -99,25 +126,91 @@ def update_progress(chapter_id: int, kind: str, correct: bool):
         prog["ex_done"] += 1
         if correct:
             prog["ex_correct"] += 1
+
     st.session_state.progress[key] = prog
     save_progress(st.session_state.user_id, chapter_id, prog)
 
-def log_exercise_answer(user_id: str, chapter_id: int, exercise_key: str,
-                        answer_text: str, is_correct: bool | None):
-    query = text("""
+
+def log_exercise_answer(
+    user_id: str,
+    chapter_id: int,
+    exercise_key: str,
+    answer_text: str,
+    is_correct: bool | None,
+):
+    """
+    Sla elk individueel antwoord op in exercise_answers.
+    """
+    query = text(
+        """
         insert into exercise_answers (user_id, chapter_id, exercise_key, answer_text, is_correct)
         values (:user_id, :chapter_id, :exercise_key, :answer_text, :is_correct)
-    """)
+        """
+    )
     with conn.session as s:
-        s.execute(query, {
-            "user_id": user_id,
-            "chapter_id": chapter_id,
-            "exercise_key": exercise_key,
-            "answer_text": answer_text,
-            "is_correct": is_correct,
-        })
+        s.execute(
+            query,
+            {
+                "user_id": user_id,
+                "chapter_id": chapter_id,
+                "exercise_key": exercise_key,
+                "answer_text": answer_text,
+                "is_correct": is_correct,
+            },
+        )
         s.commit()
 
+
+# ---------------------------------------------------------
+# Schrijf-antwoorden per hoofdstuk
+# ---------------------------------------------------------
+
+def load_writing_answer(user_id: str, chapter_id: int) -> str:
+    """
+    Haal de laatste opgeslagen schrijftekst voor een hoofdstuk op.
+    """
+    query = text(
+        """
+        select answer_text
+        from writing_answers
+        where user_id = :user_id and chapter_id = :chapter_id
+        order by updated_at desc
+        limit 1
+        """
+    )
+    with conn.session as s:
+        row = s.execute(
+            query,
+            {"user_id": user_id, "chapter_id": chapter_id},
+        ).fetchone()
+    if row:
+        return row[0]
+    return ""
+
+
+def save_writing_answer(user_id: str, chapter_id: int, answer_text: str):
+    """
+    Sla de (laatste) schrijftekst per hoofdstuk op.
+    """
+    query = text(
+        """
+        insert into writing_answers (user_id, chapter_id, answer_text)
+        values (:user_id, :chapter_id, :answer_text)
+        on conflict (user_id, chapter_id) do update set
+          answer_text = excluded.answer_text,
+          updated_at  = now()
+        """
+    )
+    with conn.session as s:
+        s.execute(
+            query,
+            {
+                "user_id": user_id,
+                "chapter_id": chapter_id,
+                "answer_text": answer_text,
+            },
+        )
+        s.commit()
 # ---------------------------------------------------------
 # Cursusdata per hoofdstuk
 # ---------------------------------------------------------
@@ -1800,7 +1893,7 @@ st.sidebar.markdown(
 MODES = [
     "Leercursus (hoofdstukken)",
     "Schrijven (vrije teksten)",
-    "Studieplan"
+    "Studieplan",
 ]
 
 mode = st.sidebar.radio("Modus", MODES)
@@ -1815,6 +1908,15 @@ if mode == "Leercursus (hoofdstukken)":
     chapter = next(c for c in CHAPTERS if c["title"] == selected_title)
 
     st.title(chapter["title"])
+
+    # Voortgang uit DB tonen
+    prog = get_progress(chapter["id"])
+    st.markdown(
+        f"**Voortgang {st.session_state.user_id}:** "
+        f"lees {prog['reading_correct']}/{prog['reading_done']}, "
+        f"oefeningen {prog['ex_correct']}/{prog['ex_done']} ✅"
+    )
+
     st.markdown(f"**Doel (NL):** {chapter['goal_nl']}")
     st.markdown("---")
 
@@ -1825,7 +1927,10 @@ if mode == "Leercursus (hoofdstukken)":
     # ---------- Theorie ----------
     with tab_theory:
         if "intro_audio_fr" in chapter:
-            if st.button("▶ Luister hoofdstuk-intro (FR)", key=f"intro_{chapter['id']}"):
+            if st.button(
+                "▶ Luister hoofdstuk-intro (FR)",
+                key=f"intro_{chapter['id']}",
+            ):
                 audio_data = tts_bytes(chapter["intro_audio_fr"], lang="fr")
                 st.audio(audio_data, format="audio/mp3")
 
@@ -1836,7 +1941,10 @@ if mode == "Leercursus (hoofdstukken)":
             cols = st.columns([3, 1])
             with cols[0]:
                 st.markdown(f"**FR:** {fr}")
-                if st.button("▶ Luister", key=f"ex_audio_{chapter['id']}_{fr}"):
+                if st.button(
+                    "▶ Luister",
+                    key=f"ex_audio_{chapter['id']}_{fr}",
+                ):
                     audio_data = tts_bytes(fr, lang="fr")
                     st.audio(audio_data, format="audio/mp3")
             with cols[1]:
@@ -1849,7 +1957,10 @@ if mode == "Leercursus (hoofdstukken)":
         for speaker, fr, nl in dlg["turns"]:
             st.markdown(f"**{speaker} – FR:** {fr}")
             st.markdown(f"*NL:* {nl}")
-            if st.button(f"▶ Luister ({speaker})", key=f"dlg_{chapter['id']}_{speaker}_{fr}"):
+            if st.button(
+                f"▶ Luister ({speaker})",
+                key=f"dlg_{chapter['id']}_{speaker}_{fr}",
+            ):
                 audio_data = tts_bytes(fr, lang="fr")
                 st.audio(audio_data, format="audio/mp3")
             st.markdown("")
@@ -1874,25 +1985,68 @@ if mode == "Leercursus (hoofdstukken)":
         for idx, q in enumerate(reading["questions"], start=1):
             st.markdown(f"#### Oefening {idx}")
             key = f"read_{chapter['id']}_{idx}"
+            exercise_key = f"ch{chapter['id']}_read_q{idx}"
+            logged_flag = f"{key}_logged"
+
             if q["type"] == "mc":
                 st.write(q["question_nl"])
-                choice = st.radio("Kies het beste antwoord:", q["options"], key=key)
+                choice = st.radio(
+                    "Kies het beste antwoord:",
+                    q["options"],
+                    key=key,
+                )
                 if choice:
-                    if choice == q["answer"]:
+                    correct = choice == q["answer"]
+
+                    # Alleen de eerste keer loggen / progress updaten
+                    if not st.session_state.get(logged_flag):
+                        update_progress(chapter["id"], "reading", correct)
+                        log_exercise_answer(
+                            st.session_state.user_id,
+                            chapter["id"],
+                            exercise_key,
+                            choice,
+                            correct,
+                        )
+                        st.session_state[logged_flag] = True
+
+                    if correct:
                         st.success("✅ Klopt!")
                     else:
-                        st.error(f"❌ Niet helemaal. Juist antwoord: **{q['answer']}**.")
+                        st.error(
+                            f"❌ Niet helemaal. Juist antwoord: **{q['answer']}**."
+                        )
                     if "explanation" in q:
                         with st.expander("Uitleg"):
                             st.write(q["explanation"])
+
             elif q["type"] == "input":
                 st.write(q["question_nl"])
-                ans = st.text_input("Jouw antwoord (Frans):", key=key)
+                ans = st.text_input(
+                    "Jouw antwoord (Frans):",
+                    key=key,
+                )
                 if ans:
-                    if normalize_answer(ans) == normalize_answer(q["answer"]):
+                    correct = normalize_answer(ans) == normalize_answer(q["answer"])
+
+                    if not st.session_state.get(logged_flag):
+                        update_progress(chapter["id"], "reading", correct)
+                        log_exercise_answer(
+                            st.session_state.user_id,
+                            chapter["id"],
+                            exercise_key,
+                            ans,
+                            correct,
+                        )
+                        st.session_state[logged_flag] = True
+
+                    if correct:
                         st.success("✅ Klopt!")
                     else:
-                        st.error(f"❌ Niet helemaal. Verwacht (kern): **{q['answer']}**.")
+                        st.error(
+                            "❌ Niet helemaal. Verwacht (kern): "
+                            f"**{q['answer']}**."
+                        )
                     if "explanation" in q:
                         with st.expander("Uitleg"):
                             st.write(q["explanation"])
@@ -1903,15 +2057,36 @@ if mode == "Leercursus (hoofdstukken)":
         for idx, ex in enumerate(chapter["exercises"], start=1):
             st.markdown(f"#### Oefening {idx}")
             key = f"ch{chapter['id']}_ex{idx}"
+            exercise_key = f"ch{chapter['id']}_ex{idx}"
+            logged_flag = f"{key}_logged"
 
             if ex["type"] == "mc":
                 st.write(ex["question_nl"])
-                choice = st.radio("Kies het beste antwoord:", ex["options"], key=key)
+                choice = st.radio(
+                    "Kies het beste antwoord:",
+                    ex["options"],
+                    key=key,
+                )
                 if choice:
-                    if choice == ex["answer"]:
+                    correct = choice == ex["answer"]
+
+                    if not st.session_state.get(logged_flag):
+                        update_progress(chapter["id"], "ex", correct)
+                        log_exercise_answer(
+                            st.session_state.user_id,
+                            chapter["id"],
+                            exercise_key,
+                            choice,
+                            correct,
+                        )
+                        st.session_state[logged_flag] = True
+
+                    if correct:
                         st.success("✅ Klopt!")
                     else:
-                        st.error(f"❌ Niet helemaal. Juist antwoord: **{ex['answer']}**.")
+                        st.error(
+                            f"❌ Niet helemaal. Juist antwoord: **{ex['answer']}**."
+                        )
                     if "explanation" in ex:
                         with st.expander("Uitleg"):
                             st.write(ex["explanation"])
@@ -1920,10 +2095,28 @@ if mode == "Leercursus (hoofdstukken)":
                 st.write(ex["question_nl"])
                 user = st.text_input("Jouw antwoord (Frans):", key=key)
                 if user:
-                    if normalize_answer(user) == normalize_answer(ex["answer"]):
+                    correct = normalize_answer(user) == normalize_answer(
+                        ex["answer"]
+                    )
+
+                    if not st.session_state.get(logged_flag):
+                        update_progress(chapter["id"], "ex", correct)
+                        log_exercise_answer(
+                            st.session_state.user_id,
+                            chapter["id"],
+                            exercise_key,
+                            user,
+                            correct,
+                        )
+                        st.session_state[logged_flag] = True
+
+                    if correct:
                         st.success("✅ Klopt!")
                     else:
-                        st.error(f"❌ Niet helemaal. Verwacht (kern): **{ex['answer']}**.")
+                        st.error(
+                            "❌ Niet helemaal. Verwacht (kern): "
+                            f"**{ex['answer']}**."
+                        )
                     if "explanation" in ex:
                         with st.expander("Uitleg"):
                             st.write(ex["explanation"])
@@ -1935,11 +2128,24 @@ if mode == "Leercursus (hoofdstukken)":
                     "Klik de delen in de juiste volgorde:",
                     options=list(range(len(parts))),
                     format_func=lambda i, parts=parts: parts[i],
-                    key=key
+                    key=key,
                 )
                 if user_order and len(user_order) == len(parts):
                     user_seq = [parts[i] for i in user_order]
-                    if user_seq == ex["correct"]:
+                    correct = user_seq == ex["correct"]
+
+                    if not st.session_state.get(logged_flag):
+                        update_progress(chapter["id"], "ex", correct)
+                        log_exercise_answer(
+                            st.session_state.user_id,
+                            chapter["id"],
+                            exercise_key,
+                            " ".join(user_seq),
+                            correct,
+                        )
+                        st.session_state[logged_flag] = True
+
+                    if correct:
                         st.success("✅ Klopt: " + " ".join(user_seq))
                     else:
                         st.error(
@@ -1954,48 +2160,81 @@ if mode == "Leercursus (hoofdstukken)":
         st.markdown("---")
         st.markdown("### Schrijfopdracht bij dit hoofdstuk")
         st.markdown(chapter["write_hint"])
+
         text_key = f"write_{chapter['id']}"
-        tekst = st.text_area("Jouw tekst (Frans):", height=220, key=text_key)
+
+        # Bestaande tekst uit DB ophalen en als default invullen
+        existing_text = load_writing_answer(
+            st.session_state.user_id, chapter["id"]
+        )
+
+        tekst = st.text_area(
+            "Jouw tekst (Frans):",
+            height=220,
+            key=text_key,
+            value=existing_text,
+        )
 
         if st.button("Analyseer tekst", key=f"analyse_{chapter['id']}"):
             if not tekst.strip():
                 st.warning("Schrijf eerst iets in het tekstvak.")
             else:
+                # Tekst opslaan in DB
+                save_writing_answer(
+                    st.session_state.user_id, chapter["id"], tekst
+                )
+
                 lower = tekst.lower()
-                hints = []
+                hints: list[str] = []
 
                 if chapter["id"] == 1:
                     if "je m'appelle" not in lower:
                         hints.append("Probeer een zin met **je m'appelle ...**.")
                     if "aujourd'hui" not in lower:
-                        hints.append("Gebruik **aujourd'hui, c'est mon premier jour de travail**.")
+                        hints.append(
+                            "Gebruik **aujourd'hui, c'est mon premier jour de travail**."
+                        )
                 elif chapter["id"] == 2:
                     if "je suis" not in lower:
-                        hints.append("Gebruik **je suis ...** om je functie te noemen.")
+                        hints.append(
+                            "Gebruik **je suis ...** om je functie te noemen."
+                        )
                     if "je travaille" not in lower:
-                        hints.append("Gebruik **je travaille ...** om te zeggen waar je werkt.")
+                        hints.append(
+                            "Gebruik **je travaille ...** om te zeggen waar je werkt."
+                        )
                 elif chapter["id"] == 3:
                     if "ça va" not in lower and "je suis" not in lower:
-                        hints.append("Gebruik **ça va ...** of **je suis ...** om te zeggen hoe het gaat.")
+                        hints.append(
+                            "Gebruik **ça va ...** of **je suis ...** om te zeggen hoe het gaat."
+                        )
                 elif chapter["id"] == 4:
                     if "beaucoup de travail" not in lower and "charge de travail" not in lower:
-                        hints.append("Noem je werkdruk met **beaucoup de travail** of **charge de travail**.")
+                        hints.append(
+                            "Noem je werkdruk met **beaucoup de travail** of **charge de travail**."
+                        )
                 elif chapter["id"] == 5:
                     if "l'année prochaine" not in lower and "plus tard" not in lower:
-                        hints.append("Gebruik **l'année prochaine** of **plus tard** voor toekomst.")
+                        hints.append(
+                            "Gebruik **l'année prochaine** of **plus tard** voor toekomst."
+                        )
                 elif chapter["id"] == 6:
                     if "j'aime" not in lower and "je n'aime pas" not in lower:
-                        hints.append("Gebruik **j'aime ...** en **je n'aime pas ...** voor voorkeuren.")
+                        hints.append(
+                            "Gebruik **j'aime ...** en **je n'aime pas ...** voor voorkeuren."
+                        )
 
                 if hints:
                     st.error("Een paar verbeterpunten:")
                     for h in hints:
                         st.markdown(f"- {h}")
                 else:
-                    st.success("Mooi! Je gebruikt de belangrijkste structuren voor dit hoofdstuk.")
+                    st.success(
+                        "Mooi! Je gebruikt de belangrijkste structuren voor dit hoofdstuk."
+                    )
 
-                st.markdown("#### Voorbeeldtekst")
-                st.code(chapter["write_example"], language="markdown")
+        st.markdown("#### Voorbeeldtekst")
+        st.code(chapter["write_example"], language="markdown")
 
 # ---------------------------------------------------------
 # Modus: Schrijven (vrije teksten)
@@ -2004,14 +2243,15 @@ if mode == "Leercursus (hoofdstukken)":
 elif mode == "Schrijven (vrije teksten)":
     st.title("Schrijven – vrije teksten over je werk")
 
-
-    st.markdown("""
+    st.markdown(
+        """
 Gebruik dit scherm om langere teksten te schrijven, bijvoorbeeld:
 
 - een korte mail aan een Franse collega  
 - een beschrijving van je werkdag  
 - een eenvoudige uitleg van een incident  
-""")
+        """
+    )
 
     tekst = st.text_area("Jouw tekst (Frans):", height=260)
 
@@ -2020,22 +2260,35 @@ Gebruik dit scherm om langere teksten te schrijven, bijvoorbeeld:
             st.warning("Schrijf eerst iets in het tekstvak.")
         else:
             lower = tekst.lower()
-            hints = []
+            hints: list[str] = []
+
             if "je m'appelle" not in lower and "je suis" not in lower:
-                hints.append("Noem jezelf met **je m'appelle ...** of **je suis ...**.")
+                hints.append(
+                    "Noem jezelf met **je m'appelle ...** of **je suis ...**."
+                )
             if "je travaille" not in lower:
                 hints.append("Vertel waar je werkt met **je travaille ...**.")
-            if "cargo" not in lower and "terminal" not in lower and "navire" not in lower:
-                hints.append("Probeer woorden als **cargo / terminal / navire** toe te voegen.")
+            if (
+                "cargo" not in lower
+                and "terminal" not in lower
+                and "navire" not in lower
+            ):
+                hints.append(
+                    "Probeer woorden als **cargo / terminal / navire** toe te voegen."
+                )
             if "aujourd'hui" not in lower and "demain" not in lower:
-                hints.append("Noem een tijdsaanduiding zoals **aujourd'hui / demain**.")
+                hints.append(
+                    "Noem een tijdsaanduiding zoals **aujourd'hui / demain**."
+                )
 
             if hints:
                 st.error("Suggesties voor verbetering:")
                 for h in hints:
                     st.markdown(f"- {h}")
             else:
-                st.success("Je tekst bevat al veel nuttige elementen voor jouw doel.")
+                st.success(
+                    "Je tekst bevat al veel nuttige elementen voor jouw doel."
+                )
 
 # ---------------------------------------------------------
 # Modus: Studieplan
@@ -2044,38 +2297,42 @@ Gebruik dit scherm om langere teksten te schrijven, bijvoorbeeld:
 elif mode == "Studieplan":
     st.title("Studieplan – 20–30 minuten per dag")
 
-    st.markdown("""
+    st.markdown(
+        """
 ### Aanpak volgens de 20-uur-methode
 
 - **Deelvaardigheden**: kennismaking, werk beschrijven, smalltalk, werkdruk, plannen, hobby's.  
 - **Leer genoeg om jezelf te corrigeren**: gebruik uitleg, voorbeelden, lees- en luisterteksten.  
 - **Verwijder drempels**: open direct de app, zet notificaties uit, vast moment per dag.  
-- **20 uur gefocust oefenen**: 20–30 minuten per dag, ~4 weken.[web:62][web:72]
+- **20 uur gefocust oefenen**: 20–30 minuten per dag, ~4 weken.
 
 ### Voorstel per week
 
 **Week 1**  
 - Dag 1–2: Hoofdstuk 1 (kennismaking)  
 - Dag 3–4: Hoofdstuk 2 (over jouw werk)  
-- Dag 5: Herhalen + schrijfopdracht
+- Dag 5: Herhalen + schrijfopdracht  
 
 **Week 2**  
 - Dag 1–2: Hoofdstuk 3 (hoe gaat het in Stavanger)  
 - Dag 3–4: Hoofdstuk 4 (werkdruk en reizen)  
-- Dag 5: Lees- en vocab-oefeningen
+- Dag 5: Lees- en vocab-oefeningen  
 
 **Week 3**  
 - Dag 1–2: Hoofdstuk 5 (toekomstplannen)  
 - Dag 3–4: Hoofdstuk 6 (hobby's en voorkeuren)  
-- Dag 5: Schrijven-modus (vrije tekst)
+- Dag 5: Schrijven-modus (vrije tekst)  
 
 **Week 4 en verder**  
 - Herhaal hoofdstukken waar je fouten maakt.  
-- Mix elke sessie:
+- Mix elke sessie:  
   - 10 min uitleg + dialoog/leesopdracht  
   - 10–20 min oefeningen + schrijfopdracht  
 
 Na ~20 uur ben je klaar voor een basiswerkgesprek met een Franse collega:
 jezelf voorstellen, over werk, weer, drukte, plannen en hobby's praten.
-    """)
-    st.caption("Gebruik een koptelefoon en spreek zinnen hardop na voor maximaal effect.")
+        """
+    )
+    st.caption(
+        "Gebruik een koptelefoon en spreek zinnen hardop na voor maximaal effect."
+    )
