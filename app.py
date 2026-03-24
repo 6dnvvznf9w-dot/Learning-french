@@ -9,8 +9,7 @@ from sqlalchemy import text
 
 # Naam moet overeenkomen met [connections.frans_db] in Streamlit secrets
 conn = st.connection("frans_db", type="sql")
-with conn.session as s:
-    s.execute(text("select 1")).fetchone()
+
 # ---------------------------------------------------------
 # Basisconfiguratie
 # ---------------------------------------------------------
