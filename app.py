@@ -484,7 +484,7 @@ Aujourd'hui, c'est mon premier jour de travail à Stavanger.""",
                     "Enchanté.",
                     "Je travaille chez Equinor."
                 ],
-                "answer": "Je suis très chargé vandaag.",
+                "answer": "Je suis très chargé aujourd'hui.",
                 "explanation": "Over werkdruk praten komt meestal later in het gesprek."
             },
             {
