@@ -1,7 +1,440 @@
 import streamlit as st
 from gtts import gTTS
 import io
+from io import BytesIO
 from sqlalchemy import text
+from dataclasses import dataclass
+from typing import Callable, List, Dict
+
+
+@dataclass
+class GrammarTopic:
+    id: str
+    title: str
+    level: str
+    theory_md: str
+    examples: List[Dict]
+    exercise_generator: Callable[[], List[Dict]]
+
+GRAMMAR_TOPICS: Dict[str, GrammarTopic] = {}
+
+def play_tts(text: str, lang: str = "fr"):
+    if not text:
+        return
+    tts = gTTS(text=text, lang=lang)
+    fp = BytesIO()
+    tts.write_to_fp(fp)
+    fp.seek(0)
+    st.audio(fp.read(), format="audio/mp3")
+
+def generate_article_exercises() -> List[Dict]:
+    nouns = [
+        {"fr": "chat", "gender": "m", "nl": "kat"},
+        {"fr": "chien", "gender": "m", "nl": "hond"},
+        {"fr": "soleil", "gender": "m", "nl": "zon"},
+        {"fr": "livre", "gender": "m", "nl": "boek"},
+        {"fr": "fromage", "gender": "m", "nl": "kaas"},
+        {"fr": "maison", "gender": "f", "nl": "huis"},
+        {"fr": "voiture", "gender": "f", "nl": "auto"},
+        {"fr": "fleur", "gender": "f", "nl": "bloem"},
+        {"fr": "nation", "gender": "f", "nl": "natie"},
+        {"fr": "télévision", "gender": "f", "nl": "televisie"},
+        # breid deze lijst gerust uit
+    ]
+
+    exercises = []
+    ex_id = 1
+
+    for noun in nouns:
+        for art_type in ["def_sg", "ind_sg", "def_pl", "ind_pl"]:
+            if art_type == "def_sg":
+                article = "le" if noun["gender"] == "m" else "la"
+                prompt = f"Kies het **bepaalde enkelvoud** lidwoord voor **{noun['fr']}**."
+            elif art_type == "ind_sg":
+                article = "un" if noun["gender"] == "m" else "une"
+                prompt = f"Kies het **onbepaalde enkelvoud** lidwoord voor **{noun['fr']}**."
+            elif art_type == "def_pl":
+                article = "les"
+                prompt = f"Kies het **bepaalde meervoud** lidwoord voor **{noun['fr']}**."
+            else:
+                article = "des"
+                prompt = f"Kies het **onbepaalde meervoud** lidwoord voor **{noun['fr']}**."
+
+            options = ["le", "la", "les", "un", "une", "des"]
+            # simpele shuffle ter plekke, zodat volgorde varieert
+            import random
+            random.shuffle(options)
+
+            correct = article
+            sentence = f"{article} {noun['fr']}"
+
+            exercises.append({
+                "id": f"art_{ex_id}",
+                "type": "mc",
+                "prompt": prompt,
+                "options": options,
+                "answer": correct,
+                "explanation": f"**{sentence}** betekent \"{correct} {noun['nl']}\".",
+                "tts": sentence,
+            })
+            ex_id += 1
+            if len(exercises) >= 100:
+                return exercises
+
+    return exercises
+
+def make_pronouns_etre_avoir_topic() -> GrammarTopic:
+    theory = dedent("""
+    ### Persoonlijke voornaamwoorden + être / avoir
+
+    **Persoonlijke voornaamwoorden (onderwerp):**
+
+    - je – ik  
+    - tu – jij (informeel)  
+    - il / elle – hij / zij  
+    - nous – wij  
+    - vous – jullie / u  
+    - ils / elles – zij (m./v.)[web:10][web:145]
+
+    **Être (zijn) – présent**
+
+    - je suis  
+    - tu es  
+    - il / elle est  
+    - nous sommes  
+    - vous êtes  
+    - ils / elles sont[web:10]
+
+    **Avoir (hebben) – présent**
+
+    - j’ai  
+    - tu as  
+    - il / elle a  
+    - nous avons  
+    - vous avez  
+    - ils / elles ont[web:10]
+    """)
+
+    examples = [
+        {"fr": "Je suis néerlandais.", "nl": "Ik ben Nederlands."},
+        {"fr": "Tu es fatigué.", "nl": "Jij bent moe."},
+        {"fr": "Nous avons une voiture.", "nl": "Wij hebben een auto."},
+        {"fr": "Ils sont à Paris.", "nl": "Zij zijn in Parijs."},
+    ]
+
+    return GrammarTopic(
+        id="pronouns_etre_avoir",
+        title="Voornaamwoorden + être/avoir",
+        level="A1",
+        theory_md=theory,
+        examples=examples,
+        exercise_generator=generate_pronoun_verb_exercises,
+    )
+
+def generate_pronoun_verb_exercises() -> List[Dict]:
+    pronouns = ["je", "tu", "il", "elle", "nous", "vous", "ils", "elles"]
+
+    etre = {
+        "je": "suis",
+        "tu": "es",
+        "il": "est",
+        "elle": "est",
+        "nous": "sommes",
+        "vous": "êtes",
+        "ils": "sont",
+        "elles": "sont",
+    }
+
+    avoir = {
+        "je": "ai",
+        "tu": "as",
+        "il": "a",
+        "elle": "a",
+        "nous": "avons",
+        "vous": "avez",
+        "ils": "ont",
+        "elles": "ont",
+    }
+
+    complements_etre = [
+        ("fatigué", "moe (m.)"),
+        ("fatiguée", "moe (v.)"),
+        ("content", "blij (m.)"),
+        ("contente", "blij (v.)"),
+        ("à Paris", "in Parijs"),
+        ("en vacances", "op vakantie"),
+    ]
+
+    complements_avoir = [
+        ("faim", "honger"),
+        ("soif", "dorst"),
+        ("un chat", "een kat"),
+        ("une voiture", "een auto"),
+        ("un problème", "een probleem"),
+    ]
+
+    import random
+    exercises = []
+    ex_id = 1
+
+    # helft être, helft avoir, tot 100
+    while len(exercises) < 100:
+        if len(exercises) < 50:
+            verb_dict = etre
+            complements = complements_etre
+            verb_inf = "être"
+        else:
+            verb_dict = avoir
+            complements = complements_avoir
+            verb_inf = "avoir"
+
+        subj = random.choice(pronouns)
+        verb = verb_dict[subj]
+        comp_fr, comp_nl = random.choice(complements)
+
+        fr_sentence = f"{subj} {verb} {comp_fr}"
+        nl_hint = comp_nl
+
+        prompt = (
+            f"Vul de juiste vorm van **{verb_inf}** in:\n\n"
+            f"**{subj} ____ {comp_fr}**\n\n"
+            f"(Betekenis van het laatste deel: _{nl_hint}_.)"
+        )
+
+        exercises.append({
+            "id": f"pro_{ex_id}",
+            "type": "input",
+            "prompt": prompt,
+            "answer": verb,
+            "answer_full": fr_sentence,
+            "explanation": f"Je zegt: **{fr_sentence}**.",
+            "tts": fr_sentence,
+        })
+        ex_id += 1
+
+    return exercises
+
+def make_habiter_topic() -> GrammarTopic:
+    theory = dedent("""
+    ### Habiter (wonen) + landen / steden
+
+    **Habiter** betekent “wonen”: *J’habite à Arnhem.* – Ik woon in Arnhem.
+
+    - Voor **steden**: **à**  
+      - *J’habite à Paris.* – Ik woon in Parijs.
+    - Voor **vrouwelijke landen** (meestal op -e): **en**  
+      - *J’habite en France.* – Ik woon in Frankrijk.
+    - Voor **mannelijke landen**: **au**  
+      - *J’habite au Portugal.* – Ik woon in Portugal.
+    - Voor **meervoudslanden**: **aux**  
+      - *J’habite aux Pays-Bas.* – Ik woon in Nederland.[web:141]
+    """)
+
+    examples = [
+        {"fr": "J’habite à Arnhem.", "nl": "Ik woon in Arnhem."},
+        {"fr": "Il habite en France.", "nl": "Hij woont in Frankrijk."},
+        {"fr": "Nous habitons aux Pays-Bas.", "nl": "Wij wonen in Nederland."},
+        {"fr": "Elle habite au Canada.", "nl": "Zij woont in Canada."},
+    ]
+
+    return GrammarTopic(
+        id="habiter_places",
+        title="Habiter + landen/steden",
+        level="A1",
+        theory_md=theory,
+        examples=examples,
+        exercise_generator=generate_habiter_exercises,
+    )
+
+def generate_habiter_exercises() -> List[Dict]:
+    persons = {
+        "je": "J’habite",
+        "tu": "Tu habites",
+        "il": "Il habite",
+        "elle": "Elle habite",
+        "nous": "Nous habitons",
+        "vous": "Vous habitez",
+        "ils": "Ils habitent",
+        "elles": "Elles habitent",
+    }
+
+    cities = [("Paris", "Parijs"), ("Arnhem", "Arnhem"), ("Lyon", "Lyon")]
+    countries_f = [("France", "Frankrijk"), ("Italie", "Italië"), ("Belgique", "België")]
+    countries_m = [("Portugal", "Portugal"), ("Canada", "Canada")]
+    countries_pl = [("Pays-Bas", "Nederland"), ("États-Unis", "Verenigde Staten")]
+
+    import random
+    exercises = []
+    ex_id = 1
+
+    while len(exercises) < 100:
+        subj, conjugated = random.choice(list(persons.items()))
+        kind = random.choice(["city", "cf", "cm", "cpl"])
+
+        if kind == "city":
+            place_fr, place_nl = random.choice(cities)
+            prep = "à"
+        elif kind == "cf":
+            place_fr, place_nl = random.choice(countries_f)
+            prep = "en"
+        elif kind == "cm":
+            place_fr, place_nl = random.choice(countries_m)
+            prep = "au"
+        else:
+            place_fr, place_nl = random.choice(countries_pl)
+            prep = "aux"
+
+        fr = f"{conjugated} {prep} {place_fr}"
+        prompt = (
+            "Kies het juiste voorzetsel (**à / en / au / aux**) om de zin te vervolledigen:\n\n"
+            f"**{conjugated} ____ {place_fr}**\n\n"
+            f"(Betekenis: „ik/jij/hij/… woon in {place_nl}”.)"
+        )
+
+        options = ["à", "en", "au", "aux"]
+        import random as rnd
+        rnd.shuffle(options)
+
+        exercises.append({
+            "id": f"hab_{ex_id}",
+            "type": "mc",
+            "prompt": prompt,
+            "options": options,
+            "answer": prep,
+            "answer_full": fr,
+            "explanation": f"Je zegt: **{fr}**.",
+            "tts": fr,
+        })
+        ex_id += 1
+
+    return exercises
+
+def make_negation_topic() -> GrammarTopic:
+    theory = dedent("""
+    ### Eenvoudige negatie: ne … pas
+
+    Een zin ontkennen doe je meestal met **ne … pas** rond het werkwoord:[web:10][web:141]
+
+    - *Je parle français.* – Ik spreek Frans.  
+    - *Je ne parle pas français.* – Ik spreek geen Frans.
+
+    Regels:
+
+    - **ne** komt vóór de persoonsvorm, **pas** erna.  
+      - *Je **ne** sais **pas**.* – Ik weet het niet.
+    - Voor een klinker wordt **ne → n’**  
+      - *Je n’ai pas de voiture.* – Ik heb geen auto.
+    """)
+
+    examples = [
+        {"fr": "Je ne parle pas français.", "nl": "Ik spreek geen Frans."},
+        {"fr": "Tu n’as pas de voiture.", "nl": "Jij hebt geen auto."},
+        {"fr": "Nous ne sommes pas fatigués.", "nl": "Wij zijn niet moe."},
+    ]
+
+    return GrammarTopic(
+        id="negation_ne_pas",
+        title="Negatie: ne … pas",
+        level="A1",
+        theory_md=theory,
+        examples=examples,
+        exercise_generator=generate_negation_exercises,
+    )
+
+def generate_negation_exercises() -> List[Dict]:
+    # gebruik eerder gedefinieerde conjugaties
+    etre = {
+        "je": "suis",
+        "tu": "es",
+        "il": "est",
+        "elle": "est",
+        "nous": "sommes",
+        "vous": "êtes",
+        "ils": "sont",
+        "elles": "sont",
+    }
+    avoir = {
+        "je": "ai",
+        "tu": "as",
+        "il": "a",
+        "elle": "a",
+        "nous": "avons",
+        "vous": "avez",
+        "ils": "ont",
+        "elles": "ont",
+    }
+    habiter = {
+        "je": "habite",
+        "tu": "habites",
+        "il": "habite",
+        "elle": "habite",
+        "nous": "habitons",
+        "vous": "habitez",
+        "ils": "habitent",
+        "elles": "habitent",
+    }
+
+    complements = [
+        ("fatigué", "moe"),
+        ("ici", "hier"),
+        ("à Paris", "in Parijs"),
+        ("de voiture", "auto"),
+        ("de frères", "broers"),
+    ]
+
+    import random
+    exercises = []
+    ex_id = 1
+    pronouns = ["je", "tu", "il", "elle", "nous", "vous", "ils", "elles"]
+
+    while len(exercises) < 100:
+        verb_choice = random.choice(["etre", "avoir", "habiter"])
+        subj = random.choice(pronouns)
+        comp_fr, comp_nl = random.choice(complements)
+
+        if verb_choice == "etre":
+            verb = etre[subj]
+            infinitive = "être"
+        elif verb_choice == "avoir":
+            verb = avoir[subj]
+            infinitive = "avoir"
+        else:
+            verb = habiter[subj]
+            infinitive = "habiter"
+
+        # positieve zin
+        pos = f"{subj} {verb} {comp_fr}"
+        # negatieve zin met ne / n'
+        if verb[0] in "aeiouh":
+            neg = f"{subj} n’{verb} pas {comp_fr}"
+        else:
+            neg = f"{subj} ne {verb} pas {comp_fr}"
+
+        prompt = (
+            f"Maak van de **positieve** zin een **negatieve** zin met *ne … pas*:\n\n"
+            f"**{pos}**\n\n"
+            f"(Hint: werkwoord = *{infinitive}*, laatste deel betekent „{comp_nl}”.)"
+        )
+
+        exercises.append({
+            "id": f"neg_{ex_id}",
+            "type": "input_sentence",
+            "prompt": prompt,
+            "answer": neg,
+            "explanation": f"Je zegt: **{neg}**.",
+            "tts": neg,
+        })
+        ex_id += 1
+
+    return exercises
+
+def register_grammar_topics():
+    global GRAMMAR_TOPICS
+    GRAMMAR_TOPICS = {}
+    GRAMMAR_TOPICS["articles_gender"] = make_articles_gender_topic()
+    GRAMMAR_TOPICS["pronouns_etre_avoir"] = make_pronouns_etre_avoir_topic()
+    GRAMMAR_TOPICS["habiter_places"] = make_habiter_topic()
+    GRAMMAR_TOPICS["negation_ne_pas"] = make_negation_topic()
 
 # ---------------------------------------------------------
 # DB-verbinding (Supabase / Postgres)
@@ -1890,13 +2323,66 @@ st.sidebar.markdown(
     "Kies een modus om te oefenen."
 )
 
-MODES = [
-    "Leercursus (hoofdstukken)",
-    "Schrijven (vrije teksten)",
-    "Studieplan",
-]
 
+MODES = ["Leercursus", "Vrij oefenen", "Schrijven", "Grammatica", "Instellingen"]
 mode = st.sidebar.radio("Modus", MODES)
+
+if mode == "Grammatica":
+    register_grammar_topics()  # of alleen bij startup
+
+    topic_names = {t.title: t_id for t_id, t in GRAMMAR_TOPICS.items()}
+    choice = st.selectbox("Kies een grammatica‑onderwerp:", list(topic_names.keys()))
+    topic = GRAMMAR_TOPICS[topic_names[choice]]
+
+    tab_theory, tab_drills = st.tabs(["Uitleg", "Oefeningen"])
+
+    with tab_theory:
+        st.markdown(topic.theory_md)
+        st.markdown("**Voorbeelden:**")
+        for ex in topic.examples:
+            col1, col2, col3 = st.columns([3, 3, 1])
+            with col1:
+                st.write(f"**FR:** {ex['fr']}")
+            with col2:
+                st.write(f"NL: {ex['nl']}")
+            with col3:
+                if st.button("▶", key=f"tts_{topic.id}_{ex['fr']}"):
+                    play_tts(ex["fr"])
+
+    with tab_drills:
+        exercises = topic.exercise_generator()
+        st.write(f"{len(exercises)} oefeningen beschikbaar.")
+
+        # simpele paginering
+        start = st.number_input("Beginindex (0‑gebaseerd)", min_value=0, max_value=len(exercises)-1, value=0)
+        end = min(start + 10, len(exercises))
+        for i in range(start, end):
+            ex = exercises[i]
+            st.markdown(f"**Oefening {i+1}:**")
+            st.markdown(ex["prompt"])
+
+            if ex["type"] == "mc":
+                choice = st.radio("Kies:", ex["options"], key=f"mc_{topic.id}_{i}")
+                if st.button("Check", key=f"chk_{topic.id}_{i}"):
+                    if choice == ex["answer"]:
+                        st.success("Correct!")
+                    else:
+                        st.error(f"Niet helemaal. Antwoord: **{ex['answer_full'] if 'answer_full' in ex else ex['answer']}**")
+            elif ex["type"] == "input":
+                user = st.text_input("Jouw antwoord:", key=f"in_{topic.id}_{i}")
+                if st.button("Check", key=f"chk_{topic.id}_{i}"):
+                    if user.strip().lower() == ex["answer"]:
+                        st.success(f"Correct! {ex['answer_full']}")
+                    else:
+                        st.error(f"Antwoord: **{ex['answer_full']}**")
+            elif ex["type"] == "input_sentence":
+                user = st.text_area("Schrijf de zin in het Frans:", key=f"in_sent_{topic.id}_{i}")
+                if st.button("Check", key=f"chk_{topic.id}_{i}"):
+                    st.markdown(f"Modelantwoord:\n\n**{ex['answer']}**")
+            if ex.get("tts"):
+                if st.button("▶ Uitspraak", key=f"tts_ex_{topic.id}_{i}"):
+                    play_tts(ex["tts"])
+            st.divider()
 
 # ---------------------------------------------------------
 # Modus: Leercursus
