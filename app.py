@@ -5,7 +5,7 @@ from io import BytesIO
 from sqlalchemy import text
 from dataclasses import dataclass
 from typing import Callable, List, Dict
-
+from textwrap import dedent  # <-- nodig voor theory_md-strings
 
 @dataclass
 class GrammarTopic:
@@ -2324,11 +2324,15 @@ st.sidebar.markdown(
 )
 
 
-MODES = ["Leercursus", "Vrij oefenen", "Schrijven", "Grammatica", "Instellingen"]
+MODES = [
+    "Leercursus (hoofdstukken)",
+    "Grammatica (A1–A2)",
+    "Schrijven (vrije teksten)",
+    "Studieplan",
+]
 mode = st.sidebar.radio("Modus", MODES)
-
-if mode == "Grammatica":
-    register_grammar_topics()  # of alleen bij startup
+if mode == "Grammatica (A1–A2)":
+    register_grammar_topics()
 
     topic_names = {t.title: t_id for t_id, t in GRAMMAR_TOPICS.items()}
     choice = st.selectbox("Kies een grammatica‑onderwerp:", list(topic_names.keys()))
@@ -2353,9 +2357,14 @@ if mode == "Grammatica":
         exercises = topic.exercise_generator()
         st.write(f"{len(exercises)} oefeningen beschikbaar.")
 
-        # simpele paginering
-        start = st.number_input("Beginindex (0‑gebaseerd)", min_value=0, max_value=len(exercises)-1, value=0)
+        start = st.number_input(
+            "Beginindex (0‑gebaseerd)",
+            min_value=0,
+            max_value=len(exercises) - 1,
+            value=0,
+        )
         end = min(start + 10, len(exercises))
+
         for i in range(start, end):
             ex = exercises[i]
             st.markdown(f"**Oefening {i+1}:**")
@@ -2367,22 +2376,32 @@ if mode == "Grammatica":
                     if choice == ex["answer"]:
                         st.success("Correct!")
                     else:
-                        st.error(f"Niet helemaal. Antwoord: **{ex['answer_full'] if 'answer_full' in ex else ex['answer']}**")
+                        corr = ex.get("answer_full", ex["answer"])
+                        st.error(f"Niet helemaal. Antwoord: **{corr}**")
+
             elif ex["type"] == "input":
                 user = st.text_input("Jouw antwoord:", key=f"in_{topic.id}_{i}")
                 if st.button("Check", key=f"chk_{topic.id}_{i}"):
-                    if user.strip().lower() == ex["answer"]:
-                        st.success(f"Correct! {ex['answer_full']}")
+                    if normalize_answer(user) == normalize_answer(ex["answer"]):
+                        corr = ex.get("answer_full", ex["answer"])
+                        st.success(f"Correct! {corr}")
                     else:
-                        st.error(f"Antwoord: **{ex['answer_full']}**")
+                        corr = ex.get("answer_full", ex["answer"])
+                        st.error(f"Antwoord: **{corr}**")
+
             elif ex["type"] == "input_sentence":
-                user = st.text_area("Schrijf de zin in het Frans:", key=f"in_sent_{topic.id}_{i}")
+                user = st.text_area(
+                    "Schrijf de zin in het Frans:",
+                    key=f"in_sent_{topic.id}_{i}",
+                )
                 if st.button("Check", key=f"chk_{topic.id}_{i}"):
                     st.markdown(f"Modelantwoord:\n\n**{ex['answer']}**")
-            if ex.get("tts"):
-                if st.button("▶ Uitspraak", key=f"tts_ex_{topic.id}_{i}"):
-                    play_tts(ex["tts"])
-            st.divider()
+                    if ex.get("tts"):
+                        if st.button("▶ Uitspraak", key=f"tts_ex_{topic.id}_{i}"):
+                            play_tts(ex["tts"])
+
+        st.divider()
+
 
 # ---------------------------------------------------------
 # Modus: Leercursus
