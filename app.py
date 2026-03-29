@@ -309,6 +309,44 @@ def generate_habiter_exercises() -> List[Dict]:
 
     return exercises
 
+def make_articles_gender_topic() -> GrammarTopic:
+    theory = dedent("""
+    ### Lidwoorden & gender (le / la / les, un / une / des)
+
+    In het Frans hebben zelfstandige naamwoorden een **geslacht**:
+
+    - mannelijk (m.) → vaak met **le / un**
+    - vrouwelijk (f.) → vaak met **la / une**
+
+    Meervoud:
+
+    - bepaald meervoud: **les**
+    - onbepaald meervoud: **des**
+
+    Voorbeelden:
+
+    - *le chat* – de kat (m.)
+    - *la maison* – het huis (v.)
+    - *les voitures* – de auto's
+    - *des fleurs* – (een paar) bloemen
+    """)
+
+    examples = [
+        {"fr": "le chat", "nl": "de kat"},
+        {"fr": "la maison", "nl": "het huis"},
+        {"fr": "les voitures", "nl": "de auto's"},
+        {"fr": "des fleurs", "nl": "bloemen"},
+    ]
+
+    return GrammarTopic(
+        id="articles_gender",
+        title="Lidwoorden & gender",
+        level="A1",
+        theory_md=theory,
+        examples=examples,
+        exercise_generator=generate_article_exercises,
+    )
+
 def make_negation_topic() -> GrammarTopic:
     theory = dedent("""
     ### Eenvoudige negatie: ne … pas
