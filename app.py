@@ -186,47 +186,47 @@ def generate_pronoun_verb_exercises() -> List[Dict]:
   
 
     import random
-        exercises = []
-        ex_id = 1
-        
-        while len(exercises) < 20:
-            verb_choice = random.choice(["etre", "avoir"])
-            if verb_choice == "etre":
-                verb_dict = etre
-                complements = complements_etre
-                verb_inf = "être"
-            else:
-                verb_dict = avoir
-                complements = complements_avoir
-                verb_inf = "avoir"
-        
-            subj = random.choice(pronouns)
-            verb = verb_dict[subj]
-            comp_fr, comp_nl = random.choice(complements)
-        
-            fr_sentence = f"{subj} {verb} {comp_fr}"
-            nl_hint = comp_nl
-        
-            prompt = (
-                f"Vul de juiste vorm van **{verb_inf}** in:\n\n"
-                f"**{subj} ____ {comp_fr}**\n\n"
-                f"(Betekenis van het laatste deel: _{nl_hint}_.)"
-            )
-        
-            exercises.append(
-                {
-                    "id": f"pro_{ex_id}",
-                    "type": "input",
-                    "prompt": prompt,
-                    "answer": verb,
-                    "answer_full": fr_sentence,
-                    "explanation": f"Je zegt: **{fr_sentence}**.",
-                    "tts": fr_sentence,
-                }
-            )
-            ex_id += 1
-        
-        return exercises
+    exercises = []
+    ex_id = 1
+    
+    while len(exercises) < 20:
+        verb_choice = random.choice(["etre", "avoir"])
+        if verb_choice == "etre":
+            verb_dict = etre
+            complements = complements_etre
+            verb_inf = "être"
+        else:
+            verb_dict = avoir
+            complements = complements_avoir
+            verb_inf = "avoir"
+    
+        subj = random.choice(pronouns)
+        verb = verb_dict[subj]
+        comp_fr, comp_nl = random.choice(complements)
+    
+        fr_sentence = f"{subj} {verb} {comp_fr}"
+        nl_hint = comp_nl
+    
+        prompt = (
+            f"Vul de juiste vorm van **{verb_inf}** in:\n\n"
+            f"**{subj} ____ {comp_fr}**\n\n"
+            f"(Betekenis van het laatste deel: _{nl_hint}_.)"
+        )
+    
+        exercises.append(
+            {
+                "id": f"pro_{ex_id}",
+                "type": "input",
+                "prompt": prompt,
+                "answer": verb,
+                "answer_full": fr_sentence,
+                "explanation": f"Je zegt: **{fr_sentence}**.",
+                "tts": fr_sentence,
+            }
+        )
+        ex_id += 1
+    
+    return exercises
 
         subj = random.choice(pronouns)
         verb = verb_dict[subj]
