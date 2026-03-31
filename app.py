@@ -49,6 +49,14 @@ def generate_article_exercises() -> List[Dict]:
         {"fr": "fleur", "gender": "f", "nl": "bloem"},
         {"fr": "nation", "gender": "f", "nl": "natie"},
         {"fr": "télévision", "gender": "f", "nl": "televisie"},
+        {"fr": "navire", "gender": "m", "nl": "schip"},
+        {"fr": "navire de gaz", "gender": "m", "nl": "gasschip"},
+        {"fr": "port", "gender": "m", "nl": "haven"},
+        {"fr": "quai", "gender": "m", "nl": "kade"},
+        {"fr": "terminal", "gender": "m", "nl": "terminal"},
+        {"fr": "cargaison", "gender": "f", "nl": "lading"},
+        {"fr": "usine", "gender": "f", "nl": "fabriek"},
+        {"fr": "station", "gender": "f", "nl": "station"},
         # breid deze lijst gerust uit
     ]
 
@@ -662,6 +670,12 @@ def generate_regular_verb_exercises() -> List[Dict]:
 
     return exercises
 
+def get_current_free_prompt():
+    if "free_prompt_index" not in st.session_state:
+        st.session_state.free_prompt_index = 0
+    idx = st.session_state.free_prompt_index % len(FREE_WRITING_PROMPTS)
+    return FREE_WRITING_PROMPTS[idx]
+
 
 def register_grammar_topics():
     global GRAMMAR_TOPICS
@@ -1231,10 +1245,18 @@ Tu apprends à parler de ton travail et de ton premier projet.
                 ("résumé", "samenvatting"),
                 ("équipe", "team"),
                 ("charterer", "charterer (schepen inhuren)"),
-                ("navire", "schip"),
-                ("cargaison", "lading"),
-                ("nom", "naam"),
-                ("déjeuner", "lunchen / lunch")
+                ("un navire", "een schip"),
+                ("un navire de gaz", "een gasschip"),
+                ("la cargaison", "de lading"),
+                ("la cargaison de propane", "de propaanlading"),
+                ("le terminal de gaz", "de gasterminal"),
+                ("le port", "de haven"),
+                ("le quai", "de kade"),
+                ("un camion-citerne", "een tankwagen"),
+                ("un entrepôt", "een opslagloods / magazijn"),
+                ("un pipeline", "een pijplijn"),
+                ("déjeuner", "lunchen / lunch"),
+            ],
             ],
             "questions": [
                 {
@@ -2981,20 +3003,111 @@ if mode == "Leercursus (hoofdstukken)":
 # Modus: Schrijven (vrije teksten)
 # ---------------------------------------------------------
 
+FREE_WRITING_PROMPTS = [
+    {
+        "id": 101,
+        "title": "Mail over vertraging van een schip",
+        "hint": (
+            "Schrijf een korte mail aan een Franse collega:\n"
+            "- uitleg dat een navire vertraagd is\n"
+            "- oorzaak (weer / techniek)\n"
+            "- impact op de cargaison / terminal\n"
+        ),
+    },
+    {
+        "id": 102,
+        "title": "Je werkdag in de control room",
+        "hint": (
+            "Beschrijf je werkdag:\n"
+            "- hoe laat je begint\n"
+            "- wat je doet met cargaisons / navires / terminaux\n"
+            "- één klein probleem en hoe je het oplost\n"
+        ),
+    },
+    {
+        "id": 103,
+        "title": "Plannen voor een lifting",
+        "hint": (
+            "Schrijf een korte tekst over een lifting:\n"
+            "- welk navire, welke cargaison\n"
+            "- van welke terminal naar welke haven\n"
+            "- wat jouw rol is (planning / analyse)\n"
+        ),
+    },
+]
+
 elif mode == "Schrijven (vrije teksten)":
     st.title("Schrijven – vrije teksten over je werk")
 
     st.markdown(
-        """
-Gebruik dit scherm om langere teksten te schrijven, bijvoorbeeld:
-
-- een korte mail aan een Franse collega  
-- een beschrijving van je werkdag  
-- een eenvoudige uitleg van een incident  
-        """
+        "Gebruik dit scherm om langere teksten te schrijven in een **cargo‑context**."
     )
 
-    tekst = st.text_area("Jouw tekst (Frans):", height=260)
+    # Huidige opdracht ophalen
+    prompt = get_current_free_prompt()
+
+    cols = st.columns([4, 1])
+    with cols[0]:
+        st.markdown(f"### Opdracht: {prompt['title']}")
+    with cols[1]:
+        if st.button("🔄 Nieuwe opdracht"):
+            # naar volgende opdracht springen
+            st.session_state.free_prompt_index = (
+                st.session_state.free_prompt_index + 1
+            ) % len(FREE_WRITING_PROMPTS)
+            st.experimental_rerun()
+
+    st.markdown(prompt["hint"])
+
+    # We hergebruiken writing_answers met een eigen 'chapter_id' per opdracht
+    chapter_id = prompt["id"]
+
+    existing_text = load_writing_answer(st.session_state.user_id, chapter_id)
+
+    tekst = st.text_area(
+        "Jouw tekst (Frans):",
+        height=260,
+        key=f"free_write_{chapter_id}",
+        value=existing_text,
+    )
+
+    if st.button("Analyseer tekst", key=f"analyse_free_{chapter_id}"):
+        if not tekst.strip():
+            st.warning("Schrijf eerst iets in het tekstvak.")
+        else:
+            # Tekst opslaan in DB
+            save_writing_answer(st.session_state.user_id, chapter_id, tekst)
+
+            lower = tekst.lower()
+            hints: list[str] = []
+
+            if "je m'appelle" not in lower and "je suis" not in lower:
+                hints.append(
+                    "Noem jezelf met **je m'appelle ...** of **je suis ...**."
+                )
+            if "je travaille" not in lower:
+                hints.append("Vertel waar je werkt met **je travaille ...**.")
+            if (
+                "cargo" not in lower
+                and "terminal" not in lower
+                and "navire" not in lower
+            ):
+                hints.append(
+                    "Probeer woorden als **cargo / terminal / navire** toe te voegen."
+                )
+            if "aujourd'hui" not in lower and "demain" not in lower:
+                hints.append(
+                    "Noem een tijdsaanduiding zoals **aujourd'hui / demain**."
+                )
+
+            if hints:
+                st.error("Suggesties voor verbetering:")
+                for h in hints:
+                    st.markdown(f"- {h}")
+            else:
+                st.success(
+                    "Je tekst bevat al veel nuttige elementen voor jouw doel."
+                )
 
     if st.button("Eenvoudige analyse"):
         if not tekst.strip():
