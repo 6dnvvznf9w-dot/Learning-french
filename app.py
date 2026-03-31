@@ -26,6 +26,16 @@ def play_tts(text: str, lang: str = "fr"):
     tts.write_to_fp(fp)
     fp.seek(0)
     st.audio(fp.read(), format="audio/mp3")
+    
+def get_grammar_exercises(topic_id: str, generator: Callable[[], List[Dict]]) -> List[Dict]:
+    """
+    Genereer oefeningen één keer per sessie per topic
+    en hergebruik ze daarna uit session_state.
+    """
+    key = f"grammar_exercises_{topic_id}"
+    if key not in st.session_state:
+        st.session_state[key] = generator()
+    return st.session_state[key]
 
 def generate_article_exercises() -> List[Dict]:
     nouns = [
@@ -2392,7 +2402,7 @@ if mode == "Grammatica (A1–A2)":
                     play_tts(ex["fr"])
 
     with tab_drills:
-        exercises = topic.exercise_generator()
+    exercises = get_grammar_exercises(topic.id, topic.exercise_generator)
         st.write(f"{len(exercises)} oefeningen beschikbaar.")
 
         start = st.number_input(
