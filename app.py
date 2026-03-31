@@ -3034,7 +3034,7 @@ FREE_WRITING_PROMPTS = [
             "- wat jouw rol is (planning / analyse)\n"
         ),
     },
-]
+    ],
 
 elif mode == "Schrijven (vrije teksten)":
     st.title("Schrijven – vrije teksten over je werk")
