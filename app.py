@@ -2402,7 +2402,7 @@ if mode == "Grammatica (A1–A2)":
                     play_tts(ex["fr"])
 
     with tab_drills:
-    exercises = get_grammar_exercises(topic.id, topic.exercise_generator)
+        exercises = get_grammar_exercises(topic.id, topic.exercise_generator)
         st.write(f"{len(exercises)} oefeningen beschikbaar.")
 
         start = st.number_input(
