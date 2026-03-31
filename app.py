@@ -3036,7 +3036,7 @@ FREE_WRITING_PROMPTS = [
     },
 ]
 
-elif mode == "Schrijven (vrije teksten)":
+if mode == "Schrijven (vrije teksten)":
     st.title("Schrijven – vrije teksten over je werk")
 
     st.markdown(
