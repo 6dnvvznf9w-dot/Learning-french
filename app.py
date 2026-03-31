@@ -183,20 +183,50 @@ def generate_pronoun_verb_exercises() -> List[Dict]:
         ("un problème", "een probleem"),
     ]
 
-    import random
-    exercises = []
-    ex_id = 1
+  
 
-    # helft être, helft avoir, tot 100
-    while len(exercises) < 100:
-        if len(exercises) < 50:
-            verb_dict = etre
-            complements = complements_etre
-            verb_inf = "être"
-        else:
-            verb_dict = avoir
-            complements = complements_avoir
-            verb_inf = "avoir"
+    import random
+        exercises = []
+        ex_id = 1
+        
+        while len(exercises) < 20:
+            verb_choice = random.choice(["etre", "avoir"])
+            if verb_choice == "etre":
+                verb_dict = etre
+                complements = complements_etre
+                verb_inf = "être"
+            else:
+                verb_dict = avoir
+                complements = complements_avoir
+                verb_inf = "avoir"
+        
+            subj = random.choice(pronouns)
+            verb = verb_dict[subj]
+            comp_fr, comp_nl = random.choice(complements)
+        
+            fr_sentence = f"{subj} {verb} {comp_fr}"
+            nl_hint = comp_nl
+        
+            prompt = (
+                f"Vul de juiste vorm van **{verb_inf}** in:\n\n"
+                f"**{subj} ____ {comp_fr}**\n\n"
+                f"(Betekenis van het laatste deel: _{nl_hint}_.)"
+            )
+        
+            exercises.append(
+                {
+                    "id": f"pro_{ex_id}",
+                    "type": "input",
+                    "prompt": prompt,
+                    "answer": verb,
+                    "answer_full": fr_sentence,
+                    "explanation": f"Je zegt: **{fr_sentence}**.",
+                    "tts": fr_sentence,
+                }
+            )
+            ex_id += 1
+        
+        return exercises
 
         subj = random.choice(pronouns)
         verb = verb_dict[subj]
@@ -475,6 +505,188 @@ def generate_negation_exercises() -> List[Dict]:
         ex_id += 1
 
     return exercises
+def make_regular_verbs_topic() -> GrammarTopic:
+    theory = dedent("""
+    ### De basis: stam + uitgang (présent)
+
+    Om een Frans werkwoord in de **tegenwoordige tijd** te vervoegen, doe je twee dingen:
+
+    1. Zoek de **stam**: haal de laatste twee letters van het infinitief af  
+       (-er, -ir of -re).
+    2. Plak de **uitgang** erachter: die hoort bij de persoon (je, tu, il, nous, ...).
+
+    ----
+    #### 1. Grootste groep: werkwoorden op -ER (bijv. *parler* – praten)
+
+    Stam: **parl-**
+
+    | Persoon          | Uitgang | Voorbeeld      |
+    |------------------|---------|----------------|
+    | je (ik)          | -e      | je parle       |
+    | tu (jij)         | -es     | tu parles      |
+    | il / elle / on   | -e      | il parle       |
+    | nous (wij)       | -ons    | nous parlons   |
+    | vous (jullie/u)  | -ez     | vous parlez    |
+    | ils / elles (zij)| -ent    | ils parlent    |
+
+    Let op: de uitgangen **-e, -es, -e, -ent** klinken allemaal hetzelfde.  
+    Alleen **nous** en **vous** hoor je duidelijk anders.
+
+    ----
+    #### 2. Groep op -IR (bijv. *finir* – eindigen)
+
+    Stam: **fin-**
+
+    | Persoon          | Uitgang   | Voorbeeld        |
+    |------------------|-----------|------------------|
+    | je               | -is       | je finis         |
+    | tu               | -is       | tu finis         |
+    | il / elle        | -it       | il finit         |
+    | nous             | -issons   | nous finissons   |
+    | vous             | -issez    | vous finissez    |
+    | ils / elles      | -issent   | ils finissent    |
+
+    ----
+    #### 3. Groep op -RE (bijv. *vendre* – verkopen)
+
+    Stam: **vend-**
+
+    | Persoon          | Uitgang   | Voorbeeld        |
+    |------------------|-----------|------------------|
+    | je               | -s        | je vends         |
+    | tu               | -s        | tu vends         |
+    | il / elle        | – (niets) | il vend          |
+    | nous             | -ons      | nous vendons     |
+    | vous             | -ez       | vous vendez      |
+    | ils / elles      | -ent      | ils vendent      |
+
+    ----
+    #### De “grote vier” (onregelmatig)
+
+    De meest gebruikte werkwoorden zijn **onregelmatig** (ze volgen de regels hierboven niet):
+
+    - *être* – zijn  
+    - *avoir* – hebben  
+    - *aller* – gaan  
+    - *faire* – doen / maken  
+
+    Die moet je gewoon als geheel leren.
+
+    **Tip:** focus eerst op de **-ER‑groep**.  
+    Als je die kent, kun je al duizenden zinnen maken.
+    """)
+
+    examples = [
+        {"fr": "Je parle avec le capitaine.", "nl": "Ik praat met de kapitein."},
+        {"fr": "Nous finissons le chargement.", "nl": "Wij beëindigen het laden."},
+        {"fr": "Ils vendent du gaz liquide.", "nl": "Zij verkopen vloeibaar gas."},
+    ]
+
+    return GrammarTopic(
+        id="present_regular",
+        title="Présent van -ER/-IR/-RE",
+        level="A1",
+        theory_md=theory,
+        examples=examples,
+        exercise_generator=generate_regular_verb_exercises,
+    )
+
+def generate_regular_verb_exercises() -> List[Dict]:
+    import random
+
+    # persoon + label + sleutel voor uitgangen
+    persons = [
+        ("je", "ik", "1sg"),
+        ("tu", "jij", "2sg"),
+        ("il", "hij", "3sg"),
+        ("elle", "zij (ev.)", "3sg"),
+        ("nous", "wij", "1pl"),
+        ("vous", "jullie/u", "2pl"),
+        ("ils", "zij (m.)", "3pl"),
+        ("elles", "zij (v.)", "3pl"),
+    ]
+
+    # eindigingen per groep
+    er_endings = {
+        "1sg": "e",
+        "2sg": "es",
+        "3sg": "e",
+        "1pl": "ons",
+        "2pl": "ez",
+        "3pl": "ent",
+    }
+    ir_endings = {
+        "1sg": "is",
+        "2sg": "is",
+        "3sg": "it",
+        "1pl": "issons",
+        "2pl": "issez",
+        "3pl": "issent",
+    }
+    re_endings = {
+        "1sg": "s",
+        "2sg": "s",
+        "3sg": "",
+        "1pl": "ons",
+        "2pl": "ez",
+        "3pl": "ent",
+    }
+
+    # ook een paar cargo‑gerelateerde regelmatige werkwoorden
+    verbs = [
+        ("parler", "er", "praten", "parl"),
+        ("travailler", "er", "werken", "travaill"),
+        ("regarder", "er", "kijken", "regard"),
+        ("aimer", "er", "houden van", "aim"),
+        ("charger", "er", "laden", "charg"),
+        ("décharger", "er", "lossen", "décharg"),
+        ("embarquer", "er", "aan boord laden", "embarqu"),
+        ("débarquer", "er", "van boord halen", "débarqu"),
+        ("finir", "ir", "beëindigen", "fin"),
+        ("choisir", "ir", "kiezen", "chois"),
+        ("remplir", "ir", "vullen", "rempl"),
+        ("vendre", "re", "verkopen", "vend"),
+        ("attendre", "re", "wachten", "attend"),
+    ]
+
+    exercises: List[Dict] = []
+    ex_id = 1
+
+    while len(exercises) < 120:
+        infinitive, group, nl_gloss, stem = random.choice(verbs)
+        subj, subj_nl, key = random.choice(persons)
+
+        if group == "er":
+            ending = er_endings[key]
+        elif group == "ir":
+            ending = ir_endings[key]
+        else:  # re
+            ending = re_endings[key]
+
+        form = stem + ending
+        sentence = f"{subj} {form}"
+
+        prompt = (
+            f"Vul de juiste **présent**‑vorm in van **{infinitive}** "
+            f"voor **{subj} ({subj_nl})**.\n\n"
+            f"**{subj} ____**  (betekenis van het werkwoord: _{nl_gloss}_)."
+        )
+
+        exercises.append(
+            {
+                "id": f"reg_{ex_id}",
+                "type": "input",
+                "prompt": prompt,
+                "answer": form,
+                "answer_full": sentence,
+                "explanation": f"Je zegt: **{sentence}**.",
+                "tts": sentence,
+            }
+        )
+        ex_id += 1
+
+    return exercises
+
 
 def register_grammar_topics():
     global GRAMMAR_TOPICS
@@ -483,6 +695,7 @@ def register_grammar_topics():
     GRAMMAR_TOPICS["pronouns_etre_avoir"] = make_pronouns_etre_avoir_topic()
     GRAMMAR_TOPICS["habiter_places"] = make_habiter_topic()
     GRAMMAR_TOPICS["negation_ne_pas"] = make_negation_topic()
+    GRAMMAR_TOPICS["present_regular"] = make_regular_verbs_topic()
 
 # ---------------------------------------------------------
 # DB-verbinding (Supabase / Postgres)
