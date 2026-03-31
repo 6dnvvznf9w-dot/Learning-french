@@ -72,6 +72,7 @@ def generate_article_exercises() -> List[Dict]:
 
             options = ["le", "la", "les", "un", "une", "des"]
             # simpele shuffle ter plekke, zodat volgorde varieert
+            
             import random
             random.shuffle(options)
 
@@ -226,32 +227,6 @@ def generate_pronoun_verb_exercises() -> List[Dict]:
         )
         ex_id += 1
     
-    return exercises
-
-        subj = random.choice(pronouns)
-        verb = verb_dict[subj]
-        comp_fr, comp_nl = random.choice(complements)
-
-        fr_sentence = f"{subj} {verb} {comp_fr}"
-        nl_hint = comp_nl
-
-        prompt = (
-            f"Vul de juiste vorm van **{verb_inf}** in:\n\n"
-            f"**{subj} ____ {comp_fr}**\n\n"
-            f"(Betekenis van het laatste deel: _{nl_hint}_.)"
-        )
-
-        exercises.append({
-            "id": f"pro_{ex_id}",
-            "type": "input",
-            "prompt": prompt,
-            "answer": verb,
-            "answer_full": fr_sentence,
-            "explanation": f"Je zegt: **{fr_sentence}**.",
-            "tts": fr_sentence,
-        })
-        ex_id += 1
-
     return exercises
 
 def make_habiter_topic() -> GrammarTopic:
