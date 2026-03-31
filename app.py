@@ -3153,40 +3153,40 @@ elif mode == "Studieplan":
 
     st.markdown(
         """
-### Aanpak volgens de 20-uur-methode
-
-- **Deelvaardigheden**: kennismaking, werk beschrijven, smalltalk, werkdruk, plannen, hobby's.  
-- **Leer genoeg om jezelf te corrigeren**: gebruik uitleg, voorbeelden, lees- en luisterteksten.  
-- **Verwijder drempels**: open direct de app, zet notificaties uit, vast moment per dag.  
-- **20 uur gefocust oefenen**: 20–30 minuten per dag, ~4 weken.
-
-### Voorstel per week
-
-**Week 1**  
-- Dag 1–2: Hoofdstuk 1 (kennismaking)  
-- Dag 3–4: Hoofdstuk 2 (over jouw werk)  
-- Dag 5: Herhalen + schrijfopdracht  
-
-**Week 2**  
-- Dag 1–2: Hoofdstuk 3 (hoe gaat het in Stavanger)  
-- Dag 3–4: Hoofdstuk 4 (werkdruk en reizen)  
-- Dag 5: Lees- en vocab-oefeningen  
-
-**Week 3**  
-- Dag 1–2: Hoofdstuk 5 (toekomstplannen)  
-- Dag 3–4: Hoofdstuk 6 (hobby's en voorkeuren)  
-- Dag 5: Schrijven-modus (vrije tekst)  
-
-**Week 4 en verder**  
-- Herhaal hoofdstukken waar je fouten maakt.  
-- Mix elke sessie:  
-  - 10 min uitleg + dialoog/leesopdracht  
-  - 10–20 min oefeningen + schrijfopdracht  
-
-Na ~20 uur ben je klaar voor een basiswerkgesprek met een Franse collega:
-jezelf voorstellen, over werk, weer, drukte, plannen en hobby's praten.
-        """
-    )
-    st.caption(
-        "Gebruik een koptelefoon en spreek zinnen hardop na voor maximaal effect."
-    )
+    ### Aanpak volgens de 20-uur-methode
+    
+    - **Deelvaardigheden**: kennismaking, werk beschrijven, smalltalk, werkdruk, plannen, hobby's.  
+    - **Leer genoeg om jezelf te corrigeren**: gebruik uitleg, voorbeelden, lees- en luisterteksten.  
+    - **Verwijder drempels**: open direct de app, zet notificaties uit, vast moment per dag.  
+    - **20 uur gefocust oefenen**: 20–30 minuten per dag, ~4 weken.
+    
+    ### Voorstel per week
+    
+    **Week 1**  
+    - Dag 1–2: Hoofdstuk 1 (kennismaking)  
+    - Dag 3–4: Hoofdstuk 2 (over jouw werk)  
+    - Dag 5: Herhalen + schrijfopdracht  
+    
+    **Week 2**  
+    - Dag 1–2: Hoofdstuk 3 (hoe gaat het in Stavanger)  
+    - Dag 3–4: Hoofdstuk 4 (werkdruk en reizen)  
+    - Dag 5: Lees- en vocab-oefeningen  
+    
+    **Week 3**  
+    - Dag 1–2: Hoofdstuk 5 (toekomstplannen)  
+    - Dag 3–4: Hoofdstuk 6 (hobby's en voorkeuren)  
+    - Dag 5: Schrijven-modus (vrije tekst)  
+    
+    **Week 4 en verder**  
+    - Herhaal hoofdstukken waar je fouten maakt.  
+    - Mix elke sessie:  
+      - 10 min uitleg + dialoog/leesopdracht  
+      - 10–20 min oefeningen + schrijfopdracht  
+    
+    Na ~20 uur ben je klaar voor een basiswerkgesprek met een Franse collega:
+    jezelf voorstellen, over werk, weer, drukte, plannen en hobby's praten.
+            """
+        )
+        st.caption(
+            "Gebruik een koptelefoon en spreek zinnen hardop na voor maximaal effect."
+        )
