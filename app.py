@@ -3034,7 +3034,7 @@ FREE_WRITING_PROMPTS = [
             "- wat jouw rol is (planning / analyse)\n"
         ),
     },
-    ],
+]
 
 elif mode == "Schrijven (vrije teksten)":
     st.title("Schrijven – vrije teksten over je werk")
@@ -3078,41 +3078,6 @@ elif mode == "Schrijven (vrije teksten)":
             # Tekst opslaan in DB
             save_writing_answer(st.session_state.user_id, chapter_id, tekst)
 
-            lower = tekst.lower()
-            hints: list[str] = []
-
-            if "je m'appelle" not in lower and "je suis" not in lower:
-                hints.append(
-                    "Noem jezelf met **je m'appelle ...** of **je suis ...**."
-                )
-            if "je travaille" not in lower:
-                hints.append("Vertel waar je werkt met **je travaille ...**.")
-            if (
-                "cargo" not in lower
-                and "terminal" not in lower
-                and "navire" not in lower
-            ):
-                hints.append(
-                    "Probeer woorden als **cargo / terminal / navire** toe te voegen."
-                )
-            if "aujourd'hui" not in lower and "demain" not in lower:
-                hints.append(
-                    "Noem een tijdsaanduiding zoals **aujourd'hui / demain**."
-                )
-
-            if hints:
-                st.error("Suggesties voor verbetering:")
-                for h in hints:
-                    st.markdown(f"- {h}")
-            else:
-                st.success(
-                    "Je tekst bevat al veel nuttige elementen voor jouw doel."
-                )
-
-    if st.button("Eenvoudige analyse"):
-        if not tekst.strip():
-            st.warning("Schrijf eerst iets in het tekstvak.")
-        else:
             lower = tekst.lower()
             hints: list[str] = []
 
