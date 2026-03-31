@@ -3151,7 +3151,7 @@ elif mode == "Studieplan":
     Na ~20 uur ben je klaar voor een basiswerkgesprek met een Franse collega:
     jezelf voorstellen, over werk, weer, drukte, plannen en hobby's praten.
             """
-        )
-        st.caption(
-            "Gebruik een koptelefoon en spreek zinnen hardop na voor maximaal effect."
-        )
+    )
+    st.caption(
+        "Gebruik een koptelefoon en spreek zinnen hardop na voor maximaal effect."
+    )
