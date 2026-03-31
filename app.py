@@ -1257,7 +1257,7 @@ Tu apprends à parler de ton travail et de ton premier projet.
                 ("un pipeline", "een pijplijn"),
                 ("déjeuner", "lunchen / lunch"),
             ],
-            ],
+            
             "questions": [
                 {
                     "type": "mc",
